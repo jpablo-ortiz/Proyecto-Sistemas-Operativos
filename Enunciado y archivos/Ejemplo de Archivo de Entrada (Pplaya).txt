@@ -1,0 +1,5 @@
+Zuloaga,8,10
+Perez,9,4
+Rojas,10,10
+Florez,14,2
+Carrillo,13,5
