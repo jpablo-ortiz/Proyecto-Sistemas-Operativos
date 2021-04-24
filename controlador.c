@@ -30,12 +30,12 @@ void verificarErrorEntrada(int argc, char **argv)
     }
 }
 
-int abrirPipe(char *pipecrecibe, int lecturaEscritura)
+int abrirPipe(char *pipe, int lecturaEscritura)
 {
     int fd, creado = 0;
     do
     {
-        fd = open(pipecrecibe, O_RDONLY);
+        fd = open(pipe, O_RDONLY);
         if (fd == -1)
         {
             perror("\nError abriendo el pipe\n");
@@ -49,43 +49,51 @@ int abrirPipe(char *pipecrecibe, int lecturaEscritura)
     return fd;
 }
 
-int crearPipe(char *pipecrecibe, mode_t fifo_mode, int lecturaEscritura)
+int crearPipe(char *pipe, mode_t fifo_mode, int lecturaEscritura)
 {
     //Crear Pipe
     //unlink(pipecrecibe);
-    if (mkfifo(pipecrecibe, fifo_mode) == -1)
+    if (mkfifo(pipe, fifo_mode) == -1)
     {
         perror("Controlador mkfifo");
         exit(1);
     }
 
     //Abrir Pipe en lectura (Archivo)
-    int fd = abrirPipe(pipecrecibe, lecturaEscritura);
+    int fd = abrirPipe(pipe, lecturaEscritura);
     return fd;
 }
 
-int obtenerPipeEscrituraCliente(int fdLectura)
+agente obtenerAgente(int fdLectura)
 {
-    int leer, fdEscritura, creado = 0;
-    datap respuesta;
+    int leer;
+    agente agenteActual;
 
     // Recibir estructura datap para recibir el PipeEscritura del Cliente
-    leer = read(fdLectura, &respuesta, sizeof(respuesta));
+    leer = read(fdLectura, &agenteActual, sizeof(agenteActual));
     if (leer == -1)
     {
         perror("proceso lector:");
         exit(1);
     }
-    printf("Server lee el string %s\n", respuesta.segundopipe);
-    printf("Server el pid %d\n", respuesta.pid);
+    printf("Controlador lee el nombre del Pipe Receptor %s\n", agenteActual.pipeReceptor);
+    printf("Controlador lee el nombre del Pipe Emisor %s\n", agenteActual.pipeEmisor);
+    printf("Controlador el pid %d\n", agenteActual.pid);
 
-    //Obtener el Pipe para escritura al Cliente
+    return agenteActual;
+}
+
+int obtenerPipe(int fdLectura, int lecturaEscritura, char *pipe)
+{
+    int fd, creado = 0;
+
+    //Obtener Pipe
     do
     {
-        fdEscritura = open(respuesta.segundopipe, O_WRONLY);
-        if (fdEscritura == -1)
+        fd = open(pipe, lecturaEscritura);
+        if (fd == -1)
         {
-            perror(" Server Abriendo el segundo pipe ");
+            perror("Controlador Abriendo pipe ");
             printf(" Se volvera a intentar despues\n");
             sleep(2);
         }
@@ -93,7 +101,29 @@ int obtenerPipeEscrituraCliente(int fdLectura)
             creado = 1;
     } while (creado == 0);
 
-    return fdEscritura;
+    return fd;
+}
+
+void procesoVerificacionReserva()
+{
+}
+
+void leerReservas()
+{
+    int leer, terminate = 0;
+    while (terminate == 0)
+    {
+        leer = read(fdEmisorAgente, &reservaActual, sizeof(reservaActual));
+        if (leer == -1)
+        {
+            perror("proceso lector:");
+            exit(1);
+        }
+        printf("Nombre: %s, Hora: %d, NuMPersonas: %d\n", reservaActual.nombreFamilia, reservaActual.hora, reservaActual.numPersonas);
+        terminate = reservaActual.terminate;
+
+        procesoVerificacionReserva();
+    }
 }
 
 int main(int argc, char **argv)
@@ -109,15 +139,29 @@ int main(int argc, char **argv)
 
     mode_t fifo_mode = S_IRUSR | S_IWUSR;
 
-    int fdLectura, fdEscritura;
+    int fdLectura, fdReceptorAgente, fdEmisorAgente;
+
+    agente agenteActual;
+    reserva reservaActual;
 
     //Crear Pipe de lectura
     fdLectura = crearPipe(pipecrecibe, fifo_mode, O_RDONLY);
 
-    //Leer Pipe de Lectura Para Obtener Pipe de escritura del Cliente
-    fdEscritura = obtenerPipeEscrituraCliente(fdLectura);
+    //TODO EL PROCESO DE ABAJO ES SOLO PARA UN AGENTE (ADAPTAR PARA VARIOS)
 
-    write(fdEscritura, "Hola", 5);
+    //Se lee el receptor que haya llegado al Pipe de lectura
+    agenteActual = obtenerAgente(fdLectura);
+
+    //Leer Pipe de Lectura Para Obtener Pipe receptor del Cliente
+    fdReceptorAgente = obtenerPipe(fdLectura, O_WRONLY, agenteActual.pipeReceptor);
+
+    //Leer Pipe de Lectura Para Obtener Pipe emisor del Cliente
+    fdEmisorAgente = obtenerPipe(fdLectura, O_RDONLY, agenteActual.pipeEmisor);
+
+    // Recibir estructura datap para recibir el PipeEscritura del Cliente
+    leerReservas();
+
+    write(fdReceptorAgente, "Finalizó el proceso de reservas para el agente", TAMMENSAJE);
 
     exit(0);
 }
