@@ -9,8 +9,6 @@
 
 //./agente –s agentazo –a archivosolicitudes –p pipecrecibe
 
-datap datosAgente;
-
 void verificarErrorEntrada(int argc, char **argv)
 {
     /*
@@ -70,8 +68,10 @@ int main(int argc, char **argv)
 
     mode_t fifo_mode = S_IRUSR | S_IWUSR;
 
-    int fdLectura, fdEscritura, pid;
-    char mensaje[10];
+    int fdLectura, fdEscritura, pid, creado = 0;
+    char mensaje[100];
+
+    datap datosAgente;
 
     //Obtener Pipe de escritura al Servidor
     fdEscritura = abrirPipe(pipecrecibe, O_WRONLY);
@@ -79,7 +79,7 @@ int main(int argc, char **argv)
     //Poner los datos del pipe para enviar al controlador (servidor)
     pid = getpid();
     datosAgente.pid = pid;
-    strcpy(datosAgente.segundopipe, agente);
+    strcpy(datosAgente.segundopipe, argv[2]);
 
     //Crear Pipe de Lectura
     crearPipe(datosAgente.segundopipe, fifo_mode);
@@ -88,9 +88,9 @@ int main(int argc, char **argv)
     write(fdEscritura, &datosAgente, sizeof(datosAgente));
 
     //Abrir el Pipe de Lectura creado
-    fdLectura = abrirPipe(pipecrecibe, O_RDONLY);
+    fdLectura = abrirPipe(datosAgente.segundopipe, O_RDONLY);
 
-    read(fdLectura, mensaje, 10);
+    read(fdLectura, mensaje, 100);
     printf("El proceso cliente termina y lee %s \n", mensaje);
 
     exit(0);

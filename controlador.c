@@ -60,12 +60,11 @@ int crearPipe(char *pipecrecibe, mode_t fifo_mode, int lecturaEscritura)
     }
 
     //Abrir Pipe en lectura (Archivo)
-    //int fd = abrirPipe(pipecrecibe, lecturaEscritura);
-    int fd = open(pipecrecibe, O_RDONLY);
+    int fd = abrirPipe(pipecrecibe, lecturaEscritura);
     return fd;
 }
 
-int obtenerPipeEscrituraCliente(char *pipecrecibe, int fdLectura)
+int obtenerPipeEscrituraCliente(int fdLectura)
 {
     int leer, fdEscritura, creado = 0;
     datap respuesta;
@@ -99,7 +98,7 @@ int obtenerPipeEscrituraCliente(char *pipecrecibe, int fdLectura)
 
 int main(int argc, char **argv)
 {
-    //verificarErrorEntrada(argc, argv);
+    verificarErrorEntrada(argc, argv);
 
     int horaInicio = atoi(argv[2]);
     int horaFinal = atoi(argv[4]);
@@ -116,7 +115,7 @@ int main(int argc, char **argv)
     fdLectura = crearPipe(pipecrecibe, fifo_mode, O_RDONLY);
 
     //Leer Pipe de Lectura Para Obtener Pipe de escritura del Cliente
-    fdEscritura = obtenerPipeEscrituraCliente(pipecrecibe, fdLectura);
+    fdEscritura = obtenerPipeEscrituraCliente(fdLectura);
 
     write(fdEscritura, "Hola", 5);
 
