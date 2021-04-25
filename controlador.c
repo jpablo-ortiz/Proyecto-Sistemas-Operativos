@@ -7,7 +7,9 @@
 #include <unistd.h>
 #include "estructuras.h"
 
-//./controlador –i 1 –f 1 –s 1 –t 1 –p pipecrecibe
+//./controlador –i 7 –f 19 –s 1 –t 10 –p pipecrecibe
+
+int tam, totalpersonas;
 
 void verificarErrorEntrada(int argc, char **argv)
 {
@@ -26,6 +28,32 @@ void verificarErrorEntrada(int argc, char **argv)
         printf("\nArgumentos inválidos\n");
         printf("USO CORRECTO:\n");
         printf("./controlador –i horaInicio –f horafinal –s segundoshora –t totalpersonas –p pipecrecibe\n");
+        exit(1);
+    }
+
+    int horaInicio = atoi(argv[2]);
+    int horaFinal = atoi(argv[4]);
+
+    int ver1 = !(horaInicio >= 7 && horaInicio <= 19);
+    int ver2 = !(horaFinal >= 7 && horaFinal <= 19);
+    int ver3 = !(horaFinal > horaInicio);
+
+    if (ver1)
+    {
+        printf("\nError\n");
+        printf("Hora de inicio debe estar en un rango de 7 a 19 horas\n");
+        exit(1);
+    }
+    if (ver2)
+    {
+        printf("\nError\n");
+        printf("Hora final debe estar en un rango de 7 a 19 horas\n");
+        exit(1);
+    }
+    if (ver3)
+    {
+        printf("\nError\n");
+        printf("La hora final debe ser mayor que la hora de inicio\n");
         exit(1);
     }
 }
@@ -104,26 +132,27 @@ int obtenerPipe(int fdLectura, int lecturaEscritura, char *pipe)
     return fd;
 }
 
-void procesoVerificacionReserva()
+void asignarReservaEnHorario(int *numPersonas, int *numReservas, reserva reservas[tam][totalpersonas], int horaInicio, reserva reservaActual)
 {
-}
+    int hora1 = reservaActual.hora - horaInicio;
+    int hora2 = hora1 + 1;
 
-void leerReservas()
-{
-    int leer, terminate = 0;
-    while (terminate == 0)
-    {
-        leer = read(fdEmisorAgente, &reservaActual, sizeof(reservaActual));
-        if (leer == -1)
-        {
-            perror("proceso lector:");
-            exit(1);
-        }
-        printf("Nombre: %s, Hora: %d, NuMPersonas: %d\n", reservaActual.nombreFamilia, reservaActual.hora, reservaActual.numPersonas);
-        terminate = reservaActual.terminate;
+    //Asigna el número de personas a esa hora
+    numPersonas[hora1] += reservaActual.numPersonas;
+    numPersonas[hora2] += reservaActual.numPersonas;
 
-        procesoVerificacionReserva();
-    }
+    //printf("PREUBA Hora: %d, Vuelta: %d, Valor: %d\n", reservaActual.numPersonas, numPersonas[horaInicio + reservaActual.hora]);
+
+    //Poner la reserva en las horas descritas
+    strcpy(reservas[hora1][numReservas[hora1]].nombreFamilia, reservaActual.nombreFamilia);
+    reservas[hora1][numReservas[hora1]].numPersonas = reservaActual.numPersonas;
+
+    strcpy(reservas[hora2][numReservas[hora2]].nombreFamilia, reservaActual.nombreFamilia);
+    reservas[hora2][numReservas[hora2]].numPersonas = reservaActual.numPersonas;
+
+    //Contabiliza una nueva reserva aceptada a esa hora
+    numReservas[hora1]++;
+    numReservas[hora2]++;
 }
 
 int main(int argc, char **argv)
@@ -133,13 +162,26 @@ int main(int argc, char **argv)
     int horaInicio = atoi(argv[2]);
     int horaFinal = atoi(argv[4]);
     int segundoshora = atoi(argv[6]);
-    int totalpersonas = atoi(argv[8]);
-
+    totalpersonas = atoi(argv[8]);
     char *pipecrecibe = argv[10];
+
+    //TODO implementar la hora actual del sistema
+    int horaActualDelSistema = horaInicio;
+
+    tam = horaFinal - horaInicio;
+    reserva reservas[tam][totalpersonas];
+    int numPersonas[tam];
+    int numReservas[tam];
+    for (int i = 0; i <= tam; i++)
+    {
+        numPersonas[i] = 0;
+        numReservas[i] = 0;
+    }
 
     mode_t fifo_mode = S_IRUSR | S_IWUSR;
 
     int fdLectura, fdReceptorAgente, fdEmisorAgente;
+    int numSolicitudesNegadas = 0, numSolicitudesAceptadas = 0, numSolicitudesReprogramadas = 0;
 
     agente agenteActual;
     reserva reservaActual;
@@ -158,10 +200,144 @@ int main(int argc, char **argv)
     //Leer Pipe de Lectura Para Obtener Pipe emisor del Cliente
     fdEmisorAgente = obtenerPipe(fdLectura, O_RDONLY, agenteActual.pipeEmisor);
 
-    // Recibir estructura datap para recibir el PipeEscritura del Cliente
-    leerReservas();
+    //Recibir las reservas del agente y hacer las verificaciones correspondientes
+    int leer, terminate = 0;
+    do
+    {
+        leer = read(fdEmisorAgente, &reservaActual, sizeof(reservaActual));
+        if (leer == -1)
+        {
+            perror("proceso lector:");
+            exit(1);
+        }
+        terminate = reservaActual.terminate;
+
+        if (!terminate)
+        {
+            printf("\nAgente: %s\n", agenteActual.nombre);
+            printf("Nombre: %s, Hora: %d, NuMPersonas: %d\n", reservaActual.nombreFamilia, reservaActual.hora, reservaActual.numPersonas);
+
+            //Verificaciónes necesarias
+            char mensajeRespuesta[TAMMENSAJE];
+            int disponiblesHora1, disponiblesHora2, bandera = 0;
+            //Si la segunda hora de la hora pedida es menor o igual a la hora final o
+            //Si el número de personas es menor o igual a la del aforo general continue
+            //En caso contrario la reserva se niega
+            if (reservaActual.hora + 1 <= horaFinal && reservaActual.numPersonas <= totalpersonas)
+            {
+                //Si la fecha recibida es mayor a la actual del sistema continue
+                if (reservaActual.hora > horaActualDelSistema)
+                {
+                    disponiblesHora1 = totalpersonas - numPersonas[reservaActual.hora - horaInicio];
+                    disponiblesHora2 = totalpersonas - numPersonas[reservaActual.hora - horaInicio + 1];
+
+                    //Si en ambas horas que se pidieron hay disponibilidad de cupo Reserva OK
+                    if (reservaActual.numPersonas <= disponiblesHora1 && reservaActual.numPersonas <= disponiblesHora2)
+                    {
+                        reservaActual.mensajeRespuesta = 1;
+                        asignarReservaEnHorario(numPersonas, numReservas, reservas, horaInicio, reservaActual);
+                        printf("Reserva OK.\n");
+                        numSolicitudesAceptadas++;
+                    }
+                    else
+                    {
+                        for (int i = 0; i < tam - 1; i++)
+                        {
+                            disponiblesHora1 = totalpersonas - numPersonas[i];
+                            disponiblesHora2 = totalpersonas - numPersonas[i + 1];
+
+                            if (reservaActual.numPersonas <= disponiblesHora1 && reservaActual.numPersonas <= disponiblesHora2)
+                            {
+                                reservaActual.hora = horaInicio + i;
+                                reservaActual.terminate = 1;
+                                reservaActual.mensajeRespuesta = 2;
+                                asignarReservaEnHorario(numPersonas, numReservas, reservas, horaInicio, reservaActual);
+                                bandera = 1;
+                                printf("Reserva garantizada para otras horas.\n");
+                                numSolicitudesReprogramadas++;
+                                break;
+                            }
+                        }
+                        if (!bandera)
+                        {
+                            printf("Reserva negada, No se encontró otras horas disponibles.\n");
+                            reservaActual.mensajeRespuesta = 4;
+                            numSolicitudesNegadas++;
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < tam - 1; i++)
+                    {
+                        disponiblesHora1 = totalpersonas - numPersonas[i];
+                        disponiblesHora2 = totalpersonas - numPersonas[i + 1];
+
+                        if (reservaActual.numPersonas <= disponiblesHora1 && reservaActual.numPersonas <= disponiblesHora2)
+                        {
+                            reservaActual.hora = horaInicio + i;
+                            reservaActual.terminate = 1;
+                            reservaActual.mensajeRespuesta = 3;
+                            asignarReservaEnHorario(numPersonas, numReservas, reservas, horaInicio, reservaActual);
+                            bandera = 1;
+                            printf(" Reserva negada por tarde, No se encontró otras horas disponibles.\n");
+                            numSolicitudesReprogramadas++;
+                            break;
+                        }
+                    }
+                    if (!bandera)
+                    {
+                        printf("Reserva negada, Hora posterior a la del sistema y No se encontró otras horas disponibles.\n");
+                        reservaActual.mensajeRespuesta = 4;
+                        numSolicitudesNegadas++;
+                    }
+                }
+            }
+            else
+            {
+                printf("Reserva negada, Hora fuera de la jornada o numPersonas mayor al aforo.\n");
+                reservaActual.mensajeRespuesta = 4;
+                numSolicitudesNegadas++;
+            }
+
+            write(fdReceptorAgente, &reservaActual, sizeof(reservaActual));
+        }
+    } while (!terminate);
 
     write(fdReceptorAgente, "Finalizó el proceso de reservas para el agente", TAMMENSAJE);
+
+    //TODO EL PROCESO DE ARRIBA ES SOLO PARA UN AGENTE (ADAPTAR PARA VARIOS)
+
+    int max = 0, imax;
+    int min = totalpersonas, imin;
+    printf("\n");
+    for (int i = 0; i <= tam; i++)
+    {
+        printf("Hora: %d, Número de Personas reservadas: %d\n", horaInicio + i, numPersonas[i]);
+        if (numPersonas[i] > max)
+        {
+            max = numPersonas[i];
+            imax = i;
+        }
+
+        if (numPersonas[i] < min)
+        {
+            min = numPersonas[i];
+            imin = i;
+        }
+    }
+
+    //TODO
+    //no mostrar solo una hora pico y una hora menos sino todas las pico y todas las menores
+    printf("\nHora pico: %d\n", horaInicio + imax);
+    printf("Hora con menor número personas: %d\n", horaInicio + imin);
+    printf("Número solicitudes negadas: %d\n", numSolicitudesNegadas);
+    printf("Número solicitudes aceptadas en su hora: %d\n", numSolicitudesAceptadas);
+    printf("Número solicitudes reprogramadas: %d\n", numSolicitudesReprogramadas);
+
+    //Se cierran los pipes del agente y se eliminan los archivos creados en el directorio
+    close(fdLectura);
+    remove(pipecrecibe);
 
     exit(0);
 }
