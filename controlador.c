@@ -172,7 +172,7 @@ int main(int argc, char **argv)
     reserva reservas[tam][totalpersonas];
     int numPersonas[tam];
     int numReservas[tam];
-    for (int i = 0; i <= tam; i++)
+    for (int i = 0; i < tam; i++)
     {
         numPersonas[i] = 0;
         numReservas[i] = 0;
@@ -311,7 +311,7 @@ int main(int argc, char **argv)
     int max = 0, imax;
     int min = totalpersonas, imin;
     printf("\n");
-    for (int i = 0; i <= tam; i++)
+    for (int i = 0; i < tam; i++)
     {
         printf("Hora: %d, Número de Personas reservadas: %d\n", horaInicio + i, numPersonas[i]);
         if (numPersonas[i] > max)
