@@ -299,7 +299,7 @@ int main(int argc, char **argv)
 
     //TODO EL PROCESO DE ARRIBA ES SOLO PARA UN AGENTE (ADAPTAR PARA VARIOS)
 
-    int horasPico[12], horasMasDesocupadas[12];
+    int horasPico[tam], horasMasDesocupadas[tam];
     int j, k = 0;
     int max = 0, imax;
     int min = totalpersonas, imin;
