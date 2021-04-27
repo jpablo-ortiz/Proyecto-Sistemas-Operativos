@@ -14,13 +14,6 @@ typedef struct Reserva
 
 } reserva;
 
-typedef struct data
-{
-    char segundopipe[20];
-    int pid;
-
-} datap;
-
 typedef struct Agente
 {
     char nombre[20];

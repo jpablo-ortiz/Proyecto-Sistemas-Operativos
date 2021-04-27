@@ -7,23 +7,14 @@
 #include <unistd.h>
 #include "estructuras.h"
 
+//Ejemplo de ejecución
 //./controlador –i 7 –f 19 –s 1 –t 10 –p pipecrecibe
 
 int tam, totalpersonas;
 
 void verificarErrorEntrada(int argc, char **argv)
 {
-    /*
-    int ver1 = strcmp(argv[1], "-i") != 0;
-    int ver2 = strcmp(argv[3], "-f") != 0;
-    int ver3 = strcmp(argv[5], "-s") != 0;
-    int ver4 = strcmp(argv[7], "-t") != 0;
-    int ver5 = strcmp(argv[9], "-p") != 0;
-
-    printf("%d %d %d %d %d", ver1, ver2, ver3, ver4, ver5);
-    */
-
-    if (argc != 11 /*|| ver1 || ver2 || ver3 || ver4 || ver5*/)
+    if (argc != 11)
     {
         printf("\nArgumentos inválidos\n");
         printf("USO CORRECTO:\n");
@@ -97,7 +88,7 @@ agente obtenerAgente(int fdLectura)
     int leer;
     agente agenteActual;
 
-    // Recibir estructura datap para recibir el PipeEscritura del Cliente
+    // Recibir estructura agente para recibir el PipeEscritura del Cliente
     leer = read(fdLectura, &agenteActual, sizeof(agenteActual));
     if (leer == -1)
     {

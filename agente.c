@@ -7,19 +7,12 @@
 #include <unistd.h>
 #include "estructuras.h"
 
+//Ejemplo de ejecución
 //./agente –s agenteA –a ejemplo.txt –p pipecrecibe
 
 void verificarErrorEntrada(int argc, char **argv)
 {
-    /*
-    int ver1 = strcmp(argv[1], "-s") != 0;
-    int ver2 = strcmp(argv[3], "-a") != 0;
-    int ver3 = strcmp(argv[5], "-p") != 0;
-
-    printf("%s %d %s %d %d", ver1, ver2, ver3, ver4, ver5);
-    */
-
-    if (argc != 7 /*|| ver1 || ver2 || ver3*/)
+    if (argc != 7)
     {
         printf("\nArgumentos inválidos\n");
         printf("USO CORRECTO:\n");
