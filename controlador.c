@@ -299,30 +299,46 @@ int main(int argc, char **argv)
 
     //TODO EL PROCESO DE ARRIBA ES SOLO PARA UN AGENTE (ADAPTAR PARA VARIOS)
 
+    int horasPico[12], horasMasDesocupadas[12];
+    int j, k = 0;
     int max = 0, imax;
     int min = totalpersonas, imin;
     printf("\n");
     for (int i = 0; i < tam; i++)
     {
         printf("Hora: %d, Número de Personas reservadas: %d\n", horaInicio + i, numPersonas[i]);
-        if (numPersonas[i] > max)
+        if (numPersonas[i] >= max)
         {
             max = numPersonas[i];
-            imax = i;
+
+            if (i != 0)
+            {
+                horasPico[j] = horaInicio + i;
+                j++;
+            }
         }
 
-        if (numPersonas[i] < min)
+        if (numPersonas[i] <= min)
         {
             min = numPersonas[i];
-            imin = i;
+            horasMasDesocupadas[k] = horaInicio + i;
+            k++;
         }
     }
 
-    //TODO
-    //no mostrar solo una hora pico y una hora menos sino todas las pico y todas las menores
-    printf("\nHora pico: %d\n", horaInicio + imax);
-    printf("Hora con menor número personas: %d\n", horaInicio + imin);
-    printf("Número solicitudes negadas: %d\n", numSolicitudesNegadas);
+    printf("\nHoras pico: ");
+    for (int l = 0; l < j; l++)
+    {
+        printf("%d", horasPico[l]);
+        printf((l + 1 < j) ? ", " : ".");
+    }
+    printf("\nHoras con menor numero de personas: ");
+    for (int m = 0; m < k; m++)
+    {
+        printf("%d", horasMasDesocupadas[m]);
+        printf((m + 1 < k) ? ", " : ".");
+    }
+    printf("\nNúmero solicitudes negadas: %d\n", numSolicitudesNegadas);
     printf("Número solicitudes aceptadas en su hora: %d\n", numSolicitudesAceptadas);
     printf("Número solicitudes reprogramadas: %d\n", numSolicitudesReprogramadas);
 
