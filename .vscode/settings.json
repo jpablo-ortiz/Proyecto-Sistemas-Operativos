@@ -1,5 +1,9 @@
 {
     "files.associations": {
-        "algorithm": "c"
+        "algorithm": "c",
+        "array": "c",
+        "*.tcc": "c",
+        "stdio.h": "c",
+        "exception": "cpp"
     }
 }

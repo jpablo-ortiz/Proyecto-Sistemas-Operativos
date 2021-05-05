@@ -2,16 +2,16 @@
 
 all: controlador agente
 
-controlador: controlador.o
-	gcc controlador.o -o controlador
+controlador: controlador.o pipes.o
+	gcc controlador.o pipes.o -o controlador -pthread
 
-controlador.o: controlador.c
-	gcc -c controlador.c
-
-agente: agente.o
-	gcc agente.o -o agente
+agente: agente.o pipes.o
+	gcc agente.o pipes.o -o agente
 
 agente.o: agente.c
 	gcc -c agente.c
+
+pipes.o: pipes.c
+	gcc -c pipes.c
 
 clean: rm *.o controlador agente

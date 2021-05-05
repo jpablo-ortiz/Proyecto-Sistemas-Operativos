@@ -1,16 +1,15 @@
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
 #include "estructuras.h"
+#include "pipes.h"
 
 //Ejemplo de ejecución
 //./agente –s agenteA –a ejemplo.txt –p pipecrecibe
 
-void verificarErrorEntrada(int argc, char **argv)
+void VerificarErrorEntrada(int argc, char **argv)
 {
     if (argc != 7)
     {
@@ -21,76 +20,56 @@ void verificarErrorEntrada(int argc, char **argv)
     }
 }
 
-int abrirPipe(char *pipecrecibe, int lecturaEscritura)
+void LeerArchivo(char *archivo_solicitudes, int fd_emisor, int fd_receptor)
 {
-    int fd, creado = 0;
-    do
-    {
-        fd = open(pipecrecibe, lecturaEscritura);
-        if (fd == -1)
-        {
-            perror("\nError abriendo el pipe\n");
-            printf("Se volvera a intentar en 2 segundos\n");
-            sleep(2);
-        }
-        else
-            creado = 1;
-    } while (creado == 0);
-
-    return fd;
-}
-
-void crearPipe(char *pipecrecibe, mode_t fifo_mode)
-{
-    //Crear Pipe
-    unlink(pipecrecibe);
-    if (mkfifo(pipecrecibe, fifo_mode) == -1)
-    {
-        perror("Agente mkfifo");
-        exit(1);
-    }
-}
-
-void leerArchivo(char *archivoSolicitudes, int fdEmisor, int fdReceptor)
-{
-    FILE *f = fopen(archivoSolicitudes, "r");
-    reserva reservaActual;
+    reserva reserva_actual;
     char mensaje[TAMMENSAJE];
+    char delimitador[] = ",";
+    char *token;
+    FILE *f = fopen(archivo_solicitudes, "r");
 
     if (f != NULL)
     {
-        char delimitador[] = ",";
         while (fscanf(f, "%s\n", mensaje) != EOF)
         {
-            char *token = strtok(mensaje, delimitador);
-            strcpy(reservaActual.nombreFamilia, token);
+            token = strtok(mensaje, delimitador);
+            strcpy(reserva_actual.nombre_familia, token);
             token = strtok(NULL, delimitador);
             if (token != NULL)
-                reservaActual.hora = atoi(token);
+                reserva_actual.hora = atoi(token);
             token = strtok(NULL, delimitador);
             if (token != NULL)
-                reservaActual.numPersonas = atoi(token);
+                reserva_actual.num_personas = atoi(token);
 
-            printf("\nNombre: %s, Hora: %d, NuMPersonas: %d\n", reservaActual.nombreFamilia, reservaActual.hora, reservaActual.numPersonas);
-            reservaActual.terminate = 0;
+            printf("\nNombre: %s, Hora: %d, NuMPersonas: %d\n", reserva_actual.nombre_familia, reserva_actual.hora, reserva_actual.num_personas);
+            reserva_actual.finalizo = 0;
 
-            //Enviar la reserva recien leida al controlador (servidor)
-            write(fdEmisor, &reservaActual, sizeof(reservaActual));
+            //Enviar la reserva leida del archivo al controlador (servidor)
+            if (write(fd_emisor, &reserva_actual, sizeof(reserva_actual)) == -1)
+            {
+                perror("Error en escritura de la reserva");
+                exit(1);
+            }
 
             //Lee la respuesta dada por el Controlador (servidor)
-            read(fdReceptor, &reservaActual, sizeof(reservaActual));
+            if (read(fd_receptor, &reserva_actual, sizeof(reserva_actual)) == -1)
+            {
+                perror("Error en la lectura de la respuesta del controlador");
+                exit(1);
+            }
+
             printf("Respuesta: ");
 
-            switch (reservaActual.mensajeRespuesta)
+            switch (reserva_actual.mensaje_respuesta)
             {
             case 1:
                 printf("Reserva ok.\n");
                 break;
             case 2:
-                printf("Reserva garantizada para otras horas.\n");
+                printf("Sin Cupo. Reserva garantizada para otras horas.\n");
                 break;
             case 3:
-                printf("Reserva negada por tarde.\n");
+                printf("Reserva negada por tarde. Reserva garantizada para otras horas.\n");
                 break;
             case 4:
                 printf("Reserva negada, debe volver otro día.\n");
@@ -103,77 +82,87 @@ void leerArchivo(char *archivoSolicitudes, int fdEmisor, int fdReceptor)
     }
     else
     {
-        printf("Error al abrir el archivo \n");
+        perror("Error al abrir el archivo \n");
         exit(1);
     }
     fclose(f);
 
-    //Enviar mensaje con terminate true para terminar
-    reservaActual.terminate = 1;
-    write(fdEmisor, &reservaActual, sizeof(reservaActual));
+    //Enviar mensaje con finalizo true para terminar
+    reserva_actual.finalizo = 1;
+    if (write(fd_emisor, &reserva_actual, sizeof(reserva_actual)) == -1)
+    {
+        perror("Error en escritura del mensaje finalización agente");
+        exit(1);
+    }
 }
 
 int main(int argc, char **argv)
 {
-    verificarErrorEntrada(argc, argv);
+    VerificarErrorEntrada(argc, argv);
 
-    char nombreAgenteReceptor[20];
-    strcpy(nombreAgenteReceptor, argv[2]);
+    int fd_escritura, fd_emisor, fd_receptor, pid, creado = 0;
+    char mensaje[TAMMENSAJE];
+    agente datos_agente;
 
-    char nombreAgenteEmisor[20];
-    strcpy(nombreAgenteEmisor, argv[2]);
+    char nombre_agente_receptor[TAMNOMBRES];
+    strcpy(nombre_agente_receptor, argv[2]);
 
-    char nombreAgente[20];
-    strcpy(nombreAgente, argv[2]);
+    char nombre_agente_emisor[TAMNOMBRES];
+    strcpy(nombre_agente_emisor, argv[2]);
 
-    char *archivoSolicitudes = argv[4];
+    char nombre_agente[TAMNOMBRES];
+    strcpy(nombre_agente, argv[2]);
+
+    char *archivo_solicitudes = argv[4];
     char *pipecrecibe = argv[6];
 
-    mode_t fifo_mode = S_IRUSR | S_IWUSR;
-
-    int fdEscritura, fdEmisor, fdReceptor, pid, creado = 0;
-    char mensaje[TAMMENSAJE];
-
-    agente datosAgente;
-
     //Obtener Pipe de escritura al Servidor
-    fdEscritura = abrirPipe(pipecrecibe, O_WRONLY);
+    fd_escritura = AbrirPipe(pipecrecibe, O_WRONLY);
 
     //Poner los datos del pipe para enviar al controlador (servidor)
     pid = getpid();
-    datosAgente.pid = pid;
-    strcpy(datosAgente.nombre, nombreAgente);
-    strcpy(datosAgente.pipeReceptor, strcat(nombreAgenteReceptor, "Receptor"));
-    strcpy(datosAgente.pipeEmisor, strcat(nombreAgenteEmisor, "Emisor"));
+    datos_agente.pid = pid;
+    strcpy(datos_agente.nombre, nombre_agente);
+    strcpy(datos_agente.pipe_receptor, strcat(nombre_agente_receptor, "Receptor"));
+    strcpy(datos_agente.pipe_emisor, strcat(nombre_agente_emisor, "Emisor"));
 
     //Crear Pipe receptor de cada reserva de este agente
-    crearPipe(datosAgente.pipeReceptor, fifo_mode);
+    CrearPipe(datos_agente.pipe_receptor);
 
     //Crear Pipe emisor de cada reserva de este agente
-    crearPipe(datosAgente.pipeEmisor, fifo_mode);
+    CrearPipe(datos_agente.pipe_emisor);
 
-    //Se envia el dato del pipe para recibir mensajes del servidor al cliente
-    write(fdEscritura, &datosAgente, sizeof(datosAgente));
+    //Se envia el dato del agente para recibir mensajes del servidor
+    if (write(fd_escritura, &datos_agente, sizeof(datos_agente)) == -1)
+    {
+        perror("Error en escritura de los datos del agente");
+        exit(1);
+    }
+    //close(fd_escritura);
 
     //Abrir el Pipe receptor creado
-    fdReceptor = abrirPipe(datosAgente.pipeReceptor, O_RDONLY);
+    fd_receptor = AbrirPipe(datos_agente.pipe_receptor, O_RDONLY);
 
     //Abrir el Pipe emisor creado
-    fdEmisor = abrirPipe(datosAgente.pipeEmisor, O_WRONLY);
+    fd_emisor = AbrirPipe(datos_agente.pipe_emisor, O_WRONLY);
 
     //Leer y enviar cada reserca del archivo ingresado
-    leerArchivo(archivoSolicitudes, fdEmisor, fdReceptor);
+    LeerArchivo(archivo_solicitudes, fd_emisor, fd_receptor);
 
     //Se recibe la respuesta del controlador (servidor)
-    read(fdReceptor, mensaje, TAMMENSAJE);
+    if (read(fd_receptor, mensaje, TAMMENSAJE) == -1)
+    {
+        perror("Error en la lectura del mensaje final del controlador");
+        exit(1);
+    }
     printf("\nCONTROLADOR - SERVIDOR: %s\n", mensaje);
 
     //Se cierran los pipes del agente y se eliminan los archivos creados en el directorio
-    close(fdReceptor);
-    remove(datosAgente.pipeReceptor);
-    close(fdEmisor);
-    remove(datosAgente.pipeEmisor);
+    close(fd_receptor);
+    remove(datos_agente.pipe_receptor);
+    close(fd_emisor);
+    remove(datos_agente.pipe_emisor);
 
-    printf("Agente %s termina\n", datosAgente.nombre);
+    printf("Agente %s termina\n", datos_agente.nombre);
     exit(0);
 }
