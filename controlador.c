@@ -344,7 +344,7 @@ void *RealizarProcesoDeUnAgente(void *pArgs)
                                 printf("Reserva negada, No se encontró otras horas disponibles.\n");
                             }
                         }
-                    }
+                    } // if hora dentro del horario y número de personas menor o igual a las del aforo
                     else
                     {
                         for (int i = hora_actual_sistema - hora_inicial; (i < tam - 1) && (bandera == 0); i++)
@@ -383,8 +383,8 @@ void *RealizarProcesoDeUnAgente(void *pArgs)
                     perror("Error en escritura de la reserva");
                     exit(1);
                 }
-            }
-        }
+            } // Final if finalizó agente
+        }     // Final if finalizoHoraSistema
     } while (!finalizo && !finalizoHoraSistema);
 
     if (finalizo)
