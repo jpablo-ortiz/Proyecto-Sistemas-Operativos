@@ -1,3 +1,14 @@
+/*
+Archivo: controlador.c
+Realizado por: Paula Juliana Rojas, Carlos Loreto, Juan Pablo Ortiz.
+Contiene: implementación de las funcionalidades que realiza el controlador.
+Fecha última modificación: 06/05/2021
+*/
+
+//----------------------------------------
+//--------------- Includes ---------------
+//----------------------------------------
+
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdio.h>
@@ -8,22 +19,42 @@
 #include "estructuras.h"
 #include "pipes.h"
 
-//Ejemplo de ejecución
-//./controlador –i 7 –f 19 –s 1 –t 10 –p pipecrecibe
+//----------------------------------------
+//---------- Variables Globales ----------
+//----------------------------------------
 
+// Semáforos para la hora, el final del programa y el movimiento de los datos de las reservas
 sem_t sem_hora, sem_termino, sem_guardar;
-int fd_lectura;
-int tam, total_personas, hora_inicial, hora_final, segundos_hora;
-int num_solicitudes_negadas = 0, num_solicitudes_aceptadas = 0, num_solicitudes_reprogramadas = 0;
 
+// Variables globales de la hora y la verificación del final del controlador y las estadísticas
+int num_solicitudes_negadas = 0, num_solicitudes_aceptadas = 0, num_solicitudes_reprogramadas = 0;
 int hora_global;        //integer mostrando la hora global del controlador
 int termino_global = 0; //Booleano mostrando fin del controlador
 
-//Declarar los vectores y la matriz
+// Variable del descriptor de lectura del controlador
+int fd_lectura;
+
+// Variables para control de los datos del horario
+int tam, total_personas, hora_inicial, hora_final, segundos_hora;
+
+// Declarar las variables los vectores y la matriz para almacenar los datos
 reserva **reservas;
 int *num_personas;
 int *num_reservas;
+int tam;
 
+//----------------------------------------
+//-------------- Funciones ---------------
+//----------------------------------------
+
+/*
+Función: VerificarErrorEntrada
+Parámetros de Entrada: entero con la cantidad de argumentos.
+y apuntador apuntador con el contenido de los argumentos.
+Valor de salida: no tiene.
+Descripción: realiza la verificación de los argumentos
+ingresados al agente.
+*/
 void VerificarErrorEntrada(int argc, char **argv)
 {
     int hora_inicial, hora_final, ver1, ver2, ver3;
@@ -62,6 +93,13 @@ void VerificarErrorEntrada(int argc, char **argv)
     }
 }
 
+/*
+Función: ObtenerAgente
+Parámetros de Entrada: entero con el descriptor del pipe de lectura.
+Valor de salida: estructura agente con los datos de un agente.
+Descripción: realiza la lectura de una estructura agente a través del
+pipe lectura y retorna para ser utilizado posteriormente.
+*/
 agente ObtenerAgente(int fd_lectura)
 {
     agente agente_actual;
@@ -82,6 +120,13 @@ agente ObtenerAgente(int fd_lectura)
     return agente_actual;
 }
 
+/*
+Función: AsignarReservaEnHorario
+Parámetros de Entrada: estructura reserva.
+Valor de salida: no tiene.
+Descripción: realiza el proceso de guardar una reserva en la
+estructura de los datos del controlador.
+*/
 void AsignarReservaEnHorario(reserva reserva_actual)
 {
     sem_wait(&sem_guardar);
@@ -105,6 +150,15 @@ void AsignarReservaEnHorario(reserva reserva_actual)
     sem_post(&sem_guardar);
 }
 
+/*
+Función: SimularHoras
+Parámetros de Entrada: estructura horas con todos los datos necesarios
+para los horaios del controlador.
+Valor de salida: no tiene.
+Descripción: realiza el proceso de simular las horas del sistema
+imprimiendo por cada hora las familias y las cantidades de personas
+que entran y salen de la playa.
+*/
 void SimularHoras(horas *horas)
 {
     sem_wait(&sem_hora);
@@ -115,7 +169,33 @@ void SimularHoras(horas *horas)
     {
         sleep(horas->segundos_hora);
         sem_wait(&sem_hora);
+        sem_wait(&sem_guardar);
+
         hora_global++;
+        printf("\n========================================================\n");
+        printf("Hora actual: %d\n", hora_global);
+        printf("========================================================\n");
+        if (hora_global < hora_final)
+        {
+            printf("SALIDA DE LA PLAYA\n");
+            printf("Total Personas saliendo: %d\n", num_personas[hora_global - 1 - hora_inicial]);
+            for (int i = 0; i < num_reservas[hora_global - 1 - hora_inicial]; i++)
+            {
+                reserva actual = reservas[hora_global - 1 - hora_inicial][i];
+                printf("- Familia %s -> %d personas.\n", actual.nombre_familia, actual.num_personas);
+            }
+            printf("ENTRADA A LA PLAYA\n");
+            printf("Total Personas entrando: %d\n", num_personas[hora_global - hora_inicial]);
+            for (int i = 0; i < num_reservas[hora_global - hora_inicial]; i++)
+            {
+                reserva actual = reservas[hora_global - hora_inicial][i];
+                printf("- Familia %s -> %d personas.\n", actual.nombre_familia, actual.num_personas);
+            }
+            printf("========================================================\n");
+            printf("\n");
+        }
+
+        sem_post(&sem_guardar);
         sem_post(&sem_hora);
     }
 
@@ -126,6 +206,13 @@ void SimularHoras(horas *horas)
     pthread_exit(0);
 }
 
+/*
+Función: InicializarEstructurasDeDatosGlobales
+Parámetros de Entrada: no tiene.
+Valor de salida: no tiene.
+Descripción: se encarga de inicializar las estructuras de datos
+con sus respectivas dimensiones.
+*/
 void InicializarEstructurasDeDatosGlobales()
 {
     //Tamaño de filas y columnas
@@ -151,6 +238,15 @@ void InicializarEstructurasDeDatosGlobales()
     }
 }
 
+/*
+Función: RealizarProcesoDeUnAgente
+Parámetros de Entrada: void * que posteriormente se convierte
+a una estructura agente con los datos del agente recibido.
+Valor de salida: no tiene.
+Descripción: realiza la lectura de cada una de las reservas de
+un agente en especifico y se encarga de verificar sus horas y
+devolver respuesta al agente.
+*/
 void *RealizarProcesoDeUnAgente(void *pArgs)
 {
     agente *agente_actual = (agente *)pArgs;
@@ -166,6 +262,17 @@ void *RealizarProcesoDeUnAgente(void *pArgs)
 
     //Leer Pipe de Lectura Para Obtener Pipe emisor del Cliente
     fd_emisor_agente = AbrirPipe(agente_actual->pipe_emisor, O_RDONLY);
+
+    //Enviar la hora actual del sistema
+    sem_wait(&sem_hora);
+    reserva_actual.hora_sistema = hora_global;
+    sem_post(&sem_hora);
+
+    if (write(fd_receptor_agente, &reserva_actual, sizeof(reserva_actual)) == -1)
+    {
+        perror("Error en escritura de la reserva");
+        exit(1);
+    }
 
     //Recibir las reservas del agente y hacer las verificaciones correspondientes
     do
@@ -301,8 +408,16 @@ void *RealizarProcesoDeUnAgente(void *pArgs)
     pthread_exit(0);
 }
 
-void imprimirResultados()
+/*
+Función: ImprimirResultados
+Parámetros de Entrada: no tiene.
+Valor de salida: no tiene.
+Descripción: eraliza la impresión de los resultados
+de todo el horario del controlador.
+*/
+void ImprimirResultados()
 {
+    //declaración e inicialización de datos
     int horas_pico[tam], horas_mas_desocupadas[tam];
     int num_horas_pico = 0, num_horas_desocupadas = 0;
     int max = 0, min = total_personas;
@@ -333,6 +448,7 @@ void imprimirResultados()
         }
     }
 
+    //impresión de resultados finales
     printf("\nHoras pico: ");
     for (int l = 0; l < num_horas_pico; l++)
     {
@@ -350,6 +466,10 @@ void imprimirResultados()
     printf("Número solicitudes reprogramadas: %d\n", num_solicitudes_reprogramadas);
 }
 
+//----------------------------------------
+//----------------- Main -----------------
+//----------------------------------------
+
 int main(int argc, char **argv)
 {
     VerificarErrorEntrada(argc, argv);
@@ -361,7 +481,6 @@ int main(int argc, char **argv)
     total_personas = atoi(argv[8]);
     tam = hora_final - hora_inicial;
 
-    //Otras declaraciones e inicializaciones
     char *pipecrecibe = argv[10];
     agente *agente_actual;
     agente agente_actual_temp;
@@ -375,9 +494,7 @@ int main(int argc, char **argv)
     //Estructuras para los datos del sistema
     InicializarEstructurasDeDatosGlobales();
 
-    //----------------------------------------
     //---- Proceso para simular el tiempo ----
-    //----------------------------------------
 
     horas.hora_inicial = hora_inicial;
     horas.hora_final = hora_final;
@@ -390,18 +507,12 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    //----------------------------------------
-    //---- Proceso para simular el tiempo ----
-    //----------------------------------------
+    //---- Proceso para la llegada de los agentes ----
 
     //Crear Pipe de lectura
     CrearPipe(pipecrecibe);
     //Abrir Pipe en lectura
     fd_lectura = AbrirPipe(pipecrecibe, O_RDONLY);
-
-    //------------------------------------------------
-    //---- Proceso para la llegada de los agentes ----
-    //------------------------------------------------
 
     int termino = 0;
     while (!termino)
@@ -414,14 +525,13 @@ int main(int argc, char **argv)
             sem_post(&sem_termino);
 
             if (!termino)
-            {
                 agente_actual_temp = ObtenerAgente(fd_lectura);
-            }
 
         } while (agente_actual_temp.pipe_receptor[0] == '\0' && !termino);
 
         if (!termino)
         {
+            //Proceso para iniciar la lectura de reservas de un agente
             agente_actual = malloc(sizeof(agente));
             memcpy(agente_actual, &agente_actual_temp, sizeof(agente));
 
@@ -434,23 +544,9 @@ int main(int argc, char **argv)
         }
     }
 
-    //------------------------------------------------
-    //---- Proceso para la llegada de los agentes ----
-    //------------------------------------------------
-
-    //-------------------------------------------------
-    //---- Proceso para mostrar resultados finales ----
-    //-------------------------------------------------
-
     imprimirResultados();
 
-    //-------------------------------------------------
-    //---- Proceso para mostrar resultados finales ----
-    //-------------------------------------------------
-
-    //--------------------------------------------------------
     //---- Proceso para cerrar y eliminar recursos usados ----
-    //--------------------------------------------------------
 
     //Se cierran los pipes del agente y se eliminan los archivos creados en el directorio
     close(fd_lectura);
@@ -472,8 +568,4 @@ int main(int argc, char **argv)
     free(reservas);
 
     exit(0);
-
-    //--------------------------------------------------------
-    //---- Proceso para cerrar y eliminar recursos usados ----
-    //--------------------------------------------------------
 }
