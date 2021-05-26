@@ -112,9 +112,11 @@ agente ObtenerAgente(int fd_lectura)
     }
     if (agente_actual.pipe_receptor[0] != '\0')
     {
-        printf("\nControlador lee el nombre del Pipe Receptor%sA\n", agente_actual.pipe_receptor);
-        printf("Controlador lee el nombre del Pipe Emisor %s\n", agente_actual.pipe_emisor);
-        printf("Controlador el pid %d\n", agente_actual.pid);
+        printf("\nControlador recibe la conexión con el agente %s\n", agente_actual.nombre);
+        //Lineas de abajo activarlas para modo debuger
+        //printf("\nControlador lee el nombre del Pipe Receptor %s\n", agente_actual.pipe_receptor);
+        //printf("Controlador lee el nombre del Pipe Emisor %s\n", agente_actual.pipe_emisor);
+        //printf("Controlador el pid %d\n", agente_actual.pid);
     }
 
     return agente_actual;
@@ -165,13 +167,13 @@ void SimularHoras(horas *horas)
     hora_global = horas->hora_inicial;
     sem_post(&sem_hora);
 
-    for (int i = horas->hora_inicial; i < horas->hora_final; i++)
+    for (int i = horas->hora_inicial; i < horas->hora_final + 1; i++)
     {
-        sleep(horas->segundos_hora);
+        //sleep(horas->segundos_hora);
         sem_wait(&sem_hora);
         sem_wait(&sem_guardar);
 
-        hora_global++;
+        //hora_global++;
         printf("\n========================================================\n");
         printf("Hora actual: %d\n", hora_global);
         printf("========================================================\n");
@@ -179,24 +181,29 @@ void SimularHoras(horas *horas)
         {
             printf("SALIDA DE LA PLAYA\n");
             printf("Total Personas saliendo: %d\n", num_personas[hora_global - 1 - hora_inicial]);
-            for (int i = 0; i < num_reservas[hora_global - 1 - hora_inicial]; i++)
+            for (int j = 0; j < num_reservas[hora_global - 1 - hora_inicial]; j++)
             {
-                reserva actual = reservas[hora_global - 1 - hora_inicial][i];
+                reserva actual = reservas[hora_global - 1 - hora_inicial][j];
                 printf("- Familia %s -> %d personas.\n", actual.nombre_familia, actual.num_personas);
             }
             printf("ENTRADA A LA PLAYA\n");
             printf("Total Personas entrando: %d\n", num_personas[hora_global - hora_inicial]);
-            for (int i = 0; i < num_reservas[hora_global - hora_inicial]; i++)
+            for (int j = 0; j < num_reservas[hora_global - hora_inicial]; j++)
             {
-                reserva actual = reservas[hora_global - hora_inicial][i];
+                reserva actual = reservas[hora_global - hora_inicial][j];
                 printf("- Familia %s -> %d personas.\n", actual.nombre_familia, actual.num_personas);
             }
             printf("========================================================\n");
             printf("\n");
         }
 
+        hora_global++;
         sem_post(&sem_guardar);
         sem_post(&sem_hora);
+        if(i < horas->hora_final)
+        {
+            sleep(horas->segundos_hora);
+        }
     }
 
     sem_wait(&sem_termino);
@@ -544,7 +551,7 @@ int main(int argc, char **argv)
         }
     }
 
-    imprimirResultados();
+    ImprimirResultados();
 
     //---- Proceso para cerrar y eliminar recursos usados ----
 

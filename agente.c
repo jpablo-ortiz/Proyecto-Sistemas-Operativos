@@ -109,6 +109,9 @@ void LeerArchivo(char *archivo_solicitudes, int fd_emisor, int fd_receptor, int 
                 default:
                     break;
                 }
+                //Si se quiere agregar una relentización por x segundos por cada reserva
+                //activar la linea de abajo con x cantidad de segundos.
+                //sleep(10);
             }
         }
     }
